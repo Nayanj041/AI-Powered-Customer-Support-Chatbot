@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+  # Main application
+  chatbot:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGODB_URL=mongodb://mongodb:27017
+      - REDIS_URL=redis://redis:6379
+      - DEBUG=True
+    depends_on:
+      - mongodb
+      - redis
+    volumes:
+      - ./models:/app/models
+      - ./logs:/app/logs
+    networks:
+      - chatbot-network
+
+  # MongoDB database
+  mongodb:
+    image: mongo:7
+    container_name: chatbot-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=customer_support_chatbot
+    volumes:
+      - mongodb_data:/data/db
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - chatbot-network
+
+  # Redis cache
+  redis:
+    image: redis:7-alpine
+    container_name: chatbot-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - chatbot-network
+
+  # MongoDB Express (optional - for database management)
+  mongo-express:
+    image: mongo-express:1.0.0-alpha
+    container_name: chatbot-mongo-express
+    ports:
+      - "8081:8081"
+    environment:
+      - ME_CONFIG_MONGODB_SERVER=mongodb
+      - ME_CONFIG_MONGODB_PORT=27017
+      - ME_CONFIG_BASICAUTH_USERNAME=admin
+      - ME_CONFIG_BASICAUTH_PASSWORD=password
+    depends_on:
+      - mongodb
+    networks:
+      - chatbot-network
+    profiles:
+      - tools
+
+  # Redis Commander (optional - for Redis management)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: chatbot-redis-commander
+    ports:
+      - "8082:8081"
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    depends_on:
+      - redis
+    networks:
+      - chatbot-network
+    profiles:
+      - tools
+
+volumes:
+  mongodb_data:
+  redis_data:
+
+networks:
+  chatbot-network:
+    driver: bridge
